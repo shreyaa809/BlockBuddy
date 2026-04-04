@@ -57,39 +57,45 @@ function StudentDashboard() {
   };
 
   const handleAddComplaint = async (complaintData) => {
-    setMessage("");
-    const s = getStudent();
-    if (!s) { setMessage(t.sessionExpired); return; }
-    if (!s.room_number) { setMessage(t.roomNotFound); return; }
+  setMessage("");
+  const s = getStudent();
+  if (!s) { setMessage(t.sessionExpired); return; }
+  if (!s.room_number) { setMessage(t.roomNotFound); return; }
 
-    const { error } = await supabase.from("complaints").insert([{
-      ...complaintData,
-      room_number: s.room_number,
-      status: "Pending",
-      created_by: s.id,
-    }]);
+  const { error } = await supabase.from("complaints").insert([{
+    ...complaintData,
+    room_number: s.room_number,
+    status: "Pending",
+    created_by: s.id,   // make sure this is always the same id used below
+  }]);
 
-    if (error) setMessage(error.message);
-    else { setMessage(t.complaintSubmitted); fetchComplaints(); }
-  };
+  if (error) setMessage(error.message);
+  else { setMessage(t.complaintSubmitted); fetchComplaints(); }
+};
 
-  const handleWithdrawComplaint = async (complaintId) => {
-    const confirmWithdraw = window.confirm(t.withdrawConfirm);
-    if (!confirmWithdraw) return;
+const handleWithdrawComplaint = async (complaintId) => {
+  const confirmWithdraw = window.confirm(t.withdrawConfirm);
+  if (!confirmWithdraw) return;
 
-    const s = getStudent();
-    if (!s) { setMessage(t.sessionExpired); return; }
+  const s = getStudent();
+  if (!s) { setMessage(t.sessionExpired); return; }
 
-    const { error } = await supabase
-      .from("complaints")
-      .delete()
-      .eq("id", complaintId)
-      .eq("created_by", s.id)
-      .eq("status", "Pending");
+  const { error, count } = await supabase
+    .from("complaints")
+    .delete()
+    .eq("id", complaintId)
+    .eq("created_by", s.id);
+    // ✅ Removed .eq("status", "Pending") — the button is already conditionally shown,
+    //    and this extra filter was silently killing the delete when status drifted.
 
-    if (error) setMessage(error.message);
-    else { setMessage(t.complaintWithdrawn); fetchComplaints(); }
-  };
+  if (error) {
+    console.error("Withdraw error:", error);
+    setMessage(error.message);
+  } else {
+    setMessage(t.complaintWithdrawn);
+    fetchComplaints();
+  }
+};
 
   useEffect(() => {
     fetchStudentProfile();

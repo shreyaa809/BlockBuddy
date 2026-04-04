@@ -61,34 +61,38 @@ function AdminDashboard() {
   };
 
   const assignWorker = async (complaintId) => {
-    const workerId = selectedWorkers[complaintId];
-    if (!workerId) {
-      setMessage("Please select a worker first.");
-      return;
-    }
+  const workerId = selectedWorkers[complaintId];
+  if (!workerId) {
+    setMessage("Please select a worker first.");
+    return;
+  }
 
-    const { error } = await supabase
-      .from("complaints")
-      .update({
-        assigned_to: workerId,
-        status: "In Progress",
-      })
-      .eq("id", complaintId);
+  // ✅ Parse to integer — HTML select values are always strings,
+  //    but assigned_to expects an integer FK in the database.
+  const workerIdInt = parseInt(workerId, 10);
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      const workerName = workers.find((w) => w.id == workerId)?.name || "worker";
-      setMessage(`✅ Task assigned to ${workerName} successfully!`);
-      // Clear the selection for this complaint
-      setSelectedWorkers((prev) => {
-        const updated = { ...prev };
-        delete updated[complaintId];
-        return updated;
-      });
-      fetchData();
-    }
-  };
+  const { error } = await supabase
+    .from("complaints")
+    .update({
+      assigned_to: workerIdInt,
+      status: "In Progress",
+    })
+    .eq("id", complaintId);
+
+  if (error) {
+    console.error("Assign error:", error);
+    setMessage(error.message);
+  } else {
+    const workerName = workers.find((w) => w.id === workerIdInt)?.name || "worker";
+    setMessage(`✅ Task assigned to ${workerName} successfully!`);
+    setSelectedWorkers((prev) => {
+      const updated = { ...prev };
+      delete updated[complaintId];
+      return updated;
+    });
+    fetchData();
+  }
+};
 
   const unassignWorker = async (complaintId) => {
     const confirm = window.confirm("Remove this worker assignment?");
