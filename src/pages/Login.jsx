@@ -15,6 +15,7 @@ function Login() {
     phone: "",
     employeeId: "",
     password: "",
+    roomNumber: "",
   });
 
   const handleChange = (e) => {
@@ -31,6 +32,7 @@ function Login() {
       phone: "",
       employeeId: "",
       password: "",
+      roomNumber: "",
     });
   };
 
@@ -52,10 +54,27 @@ function Login() {
               name: formData.name,
               email: formData.email,
               password: formData.password,
+              room_number: formData.roomNumber,
             },
           ]);
 
           if (error) throw error;
+
+          // Also insert into profiles so complaints can reference room_number
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert([
+              {
+                name: formData.name,
+                email: formData.email,
+                room_number: formData.roomNumber,
+                role: "student",
+              },
+            ]);
+
+          if (profileError) {
+            console.error("Profile insert error:", profileError.message);
+          }
 
           alert("Student signup successful. Please login.");
           setIsSignup(false);
@@ -101,6 +120,25 @@ function Login() {
             return;
           }
 
+          // Fetch matching profile row to get the profile id (used as created_by in complaints)
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("email", formData.email)
+            .eq("role", "student")
+            .maybeSingle();
+
+          localStorage.setItem(
+            "hostelUser",
+            JSON.stringify({
+              role: "student",
+              id: profile?.id || student.id,
+              name: student.name,
+              email: student.email,
+              room_number: student.room_number,
+            })
+          );
+
           navigate("/student");
           setLoading(false);
           return;
@@ -124,6 +162,16 @@ function Login() {
             setLoading(false);
             return;
           }
+
+          localStorage.setItem(
+            "hostelUser",
+            JSON.stringify({
+              role: "admin",
+              id: admin.id,
+              name: admin.name,
+              email: admin.email,
+            })
+          );
 
           navigate("/admin");
           setLoading(false);
@@ -153,6 +201,17 @@ function Login() {
             setLoading(false);
             return;
           }
+
+          localStorage.setItem(
+            "hostelUser",
+            JSON.stringify({
+              role: "worker",
+              id: worker.id,
+              name: worker.name,
+              phone: worker.phone,
+              employee_id: worker.employee_id,
+            })
+          );
 
           if (worker.is_first_login || worker.must_change_password) {
             navigate(`/worker-signup/${worker.id}`);
@@ -217,6 +276,20 @@ function Login() {
                 placeholder="Enter your name"
                 required
               />
+
+              {loginAs === "student" && (
+                <>
+                  <label>Room Number *</label>
+                  <input
+                    type="text"
+                    name="roomNumber"
+                    value={formData.roomNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. E-017"
+                    required
+                  />
+                </>
+              )}
             </>
           )}
 

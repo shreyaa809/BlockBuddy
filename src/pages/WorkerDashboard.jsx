@@ -7,25 +7,30 @@ function WorkerDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [message, setMessage] = useState("");
 
-  const fetchAssignedComplaints = async () => {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+  const getWorker = () => {
+    const data = localStorage.getItem("hostelUser");
+    if (!data) return null;
+    const parsed = JSON.parse(data);
+    if (parsed.role !== "worker") return null;
+    return parsed;
+  };
 
-    if (userError || !userData?.user) {
-      setMessage("User not found");
+  const fetchAssignedComplaints = async () => {
+    const worker = getWorker();
+    if (!worker) {
+      setMessage("Session expired. Please login again.");
       return;
     }
 
-    const user = userData.user;
-
     const { data, error } = await supabase
-  .from("complaints")
-  .select(`
-    *,
-    assigned_worker:profiles!complaints_assigned_to_fkey(name)
-  `)
-  .eq("assigned_to", user.id)
-  .in("status", ["Pending", "In Progress"])
-  .order("created_at", { ascending: false });
+      .from("complaints")
+      .select(`
+        *,
+        assigned_worker:profiles!complaints_assigned_to_fkey(name)
+      `)
+      .eq("assigned_to", worker.id)
+      .in("status", ["Pending", "In Progress"])
+      .order("created_at", { ascending: false });
 
     if (error) {
       setMessage(error.message);
@@ -35,10 +40,9 @@ function WorkerDashboard() {
   };
 
   const handleStatusUpdate = async (complaintId, newStatus) => {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData?.user) {
-      setMessage("User not found");
+    const worker = getWorker();
+    if (!worker) {
+      setMessage("Session expired. Please login again.");
       return;
     }
 
@@ -46,7 +50,7 @@ function WorkerDashboard() {
       .from("complaints")
       .update({ status: newStatus })
       .eq("id", complaintId)
-      .eq("assigned_to", userData.user.id);
+      .eq("assigned_to", worker.id);
 
     if (error) {
       setMessage(error.message);
@@ -113,7 +117,9 @@ function WorkerDashboard() {
                   <div className="inline-row">
                     <button
                       className="btn"
-                      onClick={() => handleStatusUpdate(item.id, "In Progress")}
+                      onClick={() =>
+                        handleStatusUpdate(item.id, "In Progress")
+                      }
                       disabled={item.status === "In Progress"}
                     >
                       Mark In Progress

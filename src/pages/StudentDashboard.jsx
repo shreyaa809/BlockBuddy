@@ -8,25 +8,41 @@ function StudentDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [message, setMessage] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
+  const [student, setStudent] = useState(null);
+
+  const getStudent = () => {
+    const data = localStorage.getItem("hostelUser");
+    if (!data) return null;
+    const parsed = JSON.parse(data);
+    if (parsed.role !== "student") return null;
+    return parsed;
+  };
+
+  const fetchStudentProfile = () => {
+    const s = getStudent();
+    if (!s) {
+      setMessage("Session expired. Please login again.");
+      return;
+    }
+    setStudent(s);
+    setRoomNumber(s.room_number || "");
+  };
 
   const fetchComplaints = async () => {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData?.user) {
-      setMessage("User not found");
+    const s = getStudent();
+    if (!s) {
+      setMessage("Session expired. Please login again.");
       return;
     }
 
-    const user = userData.user;
-
     const { data, error } = await supabase
-  .from("complaints")
-  .select(`
-    *,
-    assigned_worker:profiles!complaints_assigned_to_fkey(name)
-  `)
-  .eq("created_by", user.id)
-  .order("created_at", { ascending: false });
+      .from("complaints")
+      .select(`
+        *,
+        assigned_worker:profiles!complaints_assigned_to_fkey(name)
+      `)
+      .eq("created_by", s.id)
+      .order("created_at", { ascending: false });
 
     if (error) {
       setMessage(error.message);
@@ -35,59 +51,33 @@ function StudentDashboard() {
     }
   };
 
-  const fetchStudentProfile = async () => {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData?.user) {
-      setMessage("User not found");
-      return;
-    }
-
-    const user = userData.user;
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("room_number")
-      .eq("id", user.id)
-      .single();
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setRoomNumber(data?.room_number || "");
-    }
-  };
-
   const handleAddComplaint = async (complaintData) => {
     setMessage("");
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData?.user) {
-      setMessage("User not found");
+    const s = getStudent();
+    if (!s) {
+      setMessage("Session expired. Please login again.");
       return;
     }
 
-    const user = userData.user;
-
-    if (!roomNumber) {
-      setMessage("Room number not found in profile. Please update your profile.");
+    if (!s.room_number) {
+      setMessage("Room number not found. Please sign up again.");
       return;
     }
 
     const { error } = await supabase.from("complaints").insert([
       {
         ...complaintData,
-        room_number: roomNumber,
+        room_number: s.room_number,
         status: "Pending",
-        created_by: user.id,
+        created_by: s.id,
       },
     ]);
 
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage("Complaint submitted successfully");
+      setMessage("Complaint submitted successfully!");
       fetchComplaints();
     }
   };
@@ -96,23 +86,19 @@ function StudentDashboard() {
     const confirmWithdraw = window.confirm(
       "Are you sure you want to withdraw this complaint?"
     );
-
     if (!confirmWithdraw) return;
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData?.user) {
-      setMessage("User not found");
+    const s = getStudent();
+    if (!s) {
+      setMessage("Session expired. Please login again.");
       return;
     }
-
-    const user = userData.user;
 
     const { error } = await supabase
       .from("complaints")
       .delete()
       .eq("id", complaintId)
-      .eq("created_by", user.id)
+      .eq("created_by", s.id)
       .eq("status", "Pending");
 
     if (error) {
