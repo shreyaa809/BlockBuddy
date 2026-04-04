@@ -1,28 +1,22 @@
-import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "../supabaseClient";
 
-function ProtectedRoute({ children }) {
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState(null);
+// Pass requiredRole="student"|"worker"|"admin" to each route
+function ProtectedRoute({ children, requiredRole }) {
+  const data = localStorage.getItem("hostelUser");
 
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+  if (!data) return <Navigate to="/" replace />;
 
-      if (!error) {
-        setSession(data.session);
-      }
+  const user = JSON.parse(data);
 
-      setLoading(false);
-    };
+  if (requiredRole && user.role !== requiredRole) {
+    // Redirect to their correct dashboard
+    if (user.role === "student") return <Navigate to="/student" replace />;
+    if (user.role === "worker") return <Navigate to="/worker" replace />;
+    if (user.role === "admin") return <Navigate to="/admin" replace />;
+    return <Navigate to="/" replace />;
+  }
 
-    checkSession();
-  }, []);
-
-  if (loading) return <p>Loading...</p>;
-
-  return session ? children : <Navigate to="/" replace />;
+  return children;
 }
 
 export default ProtectedRoute;

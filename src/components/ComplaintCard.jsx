@@ -1,4 +1,10 @@
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
+
 function ComplaintCard({ complaint, showAssignedWorker = true }) {
+  const { language } = useLanguage();
+  const t = translations[language];
+
   const getStatusClass = (status) => {
     if (status === "Pending") return "badge badge-pending";
     if (status === "In Progress") return "badge badge-progress";
@@ -6,9 +12,15 @@ function ComplaintCard({ complaint, showAssignedWorker = true }) {
     return "badge";
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "Not available";
+  const getStatusLabel = (status) => {
+    if (status === "Pending") return t.statusPending;
+    if (status === "In Progress") return t.statusInProgress;
+    if (status === "Resolved") return t.statusResolved;
+    return status;
+  };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return t.notAvailable;
     return new Date(dateString).toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -18,18 +30,22 @@ function ComplaintCard({ complaint, showAssignedWorker = true }) {
     });
   };
 
+  // Works whether assigned_worker comes from workers table or profiles table join
+  const assignedWorkerName =
+    complaint.assigned_worker?.name || null;
+
   return (
     <div className="complaint-card">
       <div className="complaint-top">
         <div>
           <h3 className="complaint-title">{complaint.title}</h3>
           <p className="complaint-meta">
-            Category: {complaint.category} • Room: {complaint.room_number}
+            {t.category}: {complaint.category} • {t.room}: {complaint.room_number}
           </p>
         </div>
 
         <span className={getStatusClass(complaint.status)}>
-          {complaint.status}
+          {getStatusLabel(complaint.status)}
         </span>
       </div>
 
@@ -37,13 +53,13 @@ function ComplaintCard({ complaint, showAssignedWorker = true }) {
 
       <div className="complaint-extra">
         <p className="complaint-meta">
-          <strong>Created:</strong> {formatDate(complaint.created_at)}
+          <strong>{t.created}:</strong> {formatDate(complaint.created_at)}
         </p>
 
         {showAssignedWorker && (
           <p className="complaint-meta">
-            <strong>Assigned Worker:</strong>{" "}
-            {complaint.assigned_worker?.name || "Not assigned yet"}
+            <strong>{t.assignedWorker}:</strong>{" "}
+            {assignedWorkerName || t.notAssigned}
           </p>
         )}
       </div>

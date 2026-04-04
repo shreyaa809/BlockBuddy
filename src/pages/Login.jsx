@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
 
 function Login() {
   const navigate = useNavigate();
+  const { language, toggleLanguage } = useLanguage();
+  const t = translations[language];
 
   const [loginAs, setLoginAs] = useState("student");
   const [isSignup, setIsSignup] = useState(false);
@@ -19,21 +23,11 @@ function Login() {
   });
 
   const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      employeeId: "",
-      password: "",
-      roomNumber: "",
-    });
+    setFormData({ name: "", email: "", phone: "", employeeId: "", password: "", roomNumber: "" });
   };
 
   const handleRoleChange = (role) => {
@@ -57,24 +51,17 @@ function Login() {
               room_number: formData.roomNumber,
             },
           ]);
-
           if (error) throw error;
 
-          // Also insert into profiles so complaints can reference room_number
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert([
-              {
-                name: formData.name,
-                email: formData.email,
-                room_number: formData.roomNumber,
-                role: "student",
-              },
-            ]);
-
-          if (profileError) {
-            console.error("Profile insert error:", profileError.message);
-          }
+          const { error: profileError } = await supabase.from("profiles").insert([
+            {
+              name: formData.name,
+              email: formData.email,
+              room_number: formData.roomNumber,
+              role: "student",
+            },
+          ]);
+          if (profileError) console.error("Profile insert error:", profileError.message);
 
           alert("Student signup successful. Please login.");
           setIsSignup(false);
@@ -85,13 +72,8 @@ function Login() {
 
         if (loginAs === "admin") {
           const { error } = await supabase.from("admins").insert([
-            {
-              name: formData.name,
-              email: formData.email,
-              password: formData.password,
-            },
+            { name: formData.name, email: formData.email, password: formData.password },
           ]);
-
           if (error) throw error;
 
           alert("Admin signup successful. Please login.");
@@ -108,19 +90,9 @@ function Login() {
             .eq("email", formData.email)
             .maybeSingle();
 
-          if (error || !student) {
-            alert("Student not found");
-            setLoading(false);
-            return;
-          }
+          if (error || !student) { alert("Student not found"); setLoading(false); return; }
+          if (student.password !== formData.password) { alert("Invalid student password"); setLoading(false); return; }
 
-          if (student.password !== formData.password) {
-            alert("Invalid student password");
-            setLoading(false);
-            return;
-          }
-
-          // Fetch matching profile row to get the profile id (used as created_by in complaints)
           const { data: profile } = await supabase
             .from("profiles")
             .select("*")
@@ -128,16 +100,13 @@ function Login() {
             .eq("role", "student")
             .maybeSingle();
 
-          localStorage.setItem(
-            "hostelUser",
-            JSON.stringify({
-              role: "student",
-              id: profile?.id || student.id,
-              name: student.name,
-              email: student.email,
-              room_number: student.room_number,
-            })
-          );
+          localStorage.setItem("hostelUser", JSON.stringify({
+            role: "student",
+            id: profile?.id || student.id,
+            name: student.name,
+            email: student.email,
+            room_number: student.room_number,
+          }));
 
           navigate("/student");
           setLoading(false);
@@ -151,27 +120,12 @@ function Login() {
             .eq("email", formData.email)
             .maybeSingle();
 
-          if (error || !admin) {
-            alert("Admin not found");
-            setLoading(false);
-            return;
-          }
+          if (error || !admin) { alert("Admin not found"); setLoading(false); return; }
+          if (admin.password !== formData.password) { alert("Invalid admin password"); setLoading(false); return; }
 
-          if (admin.password !== formData.password) {
-            alert("Invalid admin password");
-            setLoading(false);
-            return;
-          }
-
-          localStorage.setItem(
-            "hostelUser",
-            JSON.stringify({
-              role: "admin",
-              id: admin.id,
-              name: admin.name,
-              email: admin.email,
-            })
-          );
+          localStorage.setItem("hostelUser", JSON.stringify({
+            role: "admin", id: admin.id, name: admin.name, email: admin.email,
+          }));
 
           navigate("/admin");
           setLoading(false);
@@ -186,32 +140,18 @@ function Login() {
             .eq("phone", formData.phone)
             .maybeSingle();
 
-          if (error || !worker) {
-            alert("Worker not found");
-            setLoading(false);
-            return;
-          }
+          if (error || !worker) { alert("Worker not found"); setLoading(false); return; }
 
           const validPassword =
             worker.password === formData.password ||
             worker.temp_password === formData.password;
 
-          if (!validPassword) {
-            alert("Invalid worker credentials");
-            setLoading(false);
-            return;
-          }
+          if (!validPassword) { alert("Invalid worker credentials"); setLoading(false); return; }
 
-          localStorage.setItem(
-            "hostelUser",
-            JSON.stringify({
-              role: "worker",
-              id: worker.id,
-              name: worker.name,
-              phone: worker.phone,
-              employee_id: worker.employee_id,
-            })
-          );
+          localStorage.setItem("hostelUser", JSON.stringify({
+            role: "worker", id: worker.id, name: worker.name,
+            phone: worker.phone, employee_id: worker.employee_id,
+          }));
 
           if (worker.is_first_login || worker.must_change_password) {
             navigate(`/worker-signup/${worker.id}`);
@@ -234,32 +174,38 @@ function Login() {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>HostelFix</h1>
-        <p>{isSignup ? "Create your account" : "Login to continue"}</p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h1>{t.appName}</h1>
+          <button className="btn btn-secondary btn-sm" onClick={toggleLanguage}>
+            {t.switchLanguage}
+          </button>
+        </div>
+
+        <p>{isSignup ? t.createAccount : t.loginToContinue}</p>
 
         <div className="role-selector">
-          <label>Login As</label>
+          <label>{t.loginAs}</label>
           <div className="role-buttons">
             <button
               type="button"
               className={loginAs === "student" ? "active" : ""}
               onClick={() => handleRoleChange("student")}
             >
-              Student
+              {t.student}
             </button>
             <button
               type="button"
               className={loginAs === "worker" ? "active" : ""}
               onClick={() => handleRoleChange("worker")}
             >
-              Worker
+              {t.worker}
             </button>
             <button
               type="button"
               className={loginAs === "admin" ? "active" : ""}
               onClick={() => handleRoleChange("admin")}
             >
-              Admin
+              {t.admin}
             </button>
           </div>
         </div>
@@ -267,25 +213,25 @@ function Login() {
         <form onSubmit={handleSubmit} className="login-form">
           {isSignup && loginAs !== "worker" && (
             <>
-              <label>Name *</label>
+              <label>{t.name} *</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="Enter your name"
+                placeholder={t.namePlaceholder}
                 required
               />
 
               {loginAs === "student" && (
                 <>
-                  <label>Room Number *</label>
+                  <label>{t.roomNumber} *</label>
                   <input
                     type="text"
                     name="roomNumber"
                     value={formData.roomNumber}
                     onChange={handleChange}
-                    placeholder="e.g. E-017"
+                    placeholder={t.roomNumberPlaceholder}
                     required
                   />
                 </>
@@ -295,13 +241,13 @@ function Login() {
 
           {(loginAs === "student" || loginAs === "admin") && (
             <>
-              <label>Email *</label>
+              <label>{t.email} *</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="Enter email"
+                placeholder={t.emailPlaceholder}
                 required
               />
             </>
@@ -309,46 +255,42 @@ function Login() {
 
           {loginAs === "worker" && (
             <>
-              <label>Phone Number *</label>
+              <label>{t.phoneNumber} *</label>
               <input
                 type="text"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="Enter phone number"
+                placeholder={t.phoneNumberPlaceholder}
                 required
               />
 
-              <label>Employee ID *</label>
+              <label>{t.employeeId} *</label>
               <input
                 type="text"
                 name="employeeId"
                 value={formData.employeeId}
                 onChange={handleChange}
-                placeholder="Enter employee ID"
+                placeholder={t.employeeIdPlaceholder}
                 required
               />
             </>
           )}
 
-          <label>Password *</label>
+          <label>{t.password} *</label>
           <input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
-            placeholder="Enter password"
+            placeholder={t.passwordPlaceholder}
             required
           />
 
           <button type="submit" disabled={loading}>
             {loading
-              ? isSignup
-                ? "Signing up..."
-                : "Logging in..."
-              : isSignup
-              ? "Sign Up"
-              : "Login"}
+              ? isSignup ? t.signingUp : t.loggingIn
+              : isSignup ? t.signUp : t.login}
           </button>
         </form>
 
@@ -356,14 +298,9 @@ function Login() {
           <button
             type="button"
             className="toggle-auth-btn"
-            onClick={() => {
-              setIsSignup(!isSignup);
-              resetForm();
-            }}
+            onClick={() => { setIsSignup(!isSignup); resetForm(); }}
           >
-            {isSignup
-              ? "Already have an account? Login"
-              : "Don't have an account? Sign Up"}
+            {isSignup ? t.alreadyHaveAccount : t.dontHaveAccount}
           </button>
         )}
       </div>

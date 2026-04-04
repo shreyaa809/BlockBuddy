@@ -1,19 +1,18 @@
 import { useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
+import { translations } from "../translations";
 
 function ComplaintForm({ onSubmitComplaint }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
 
+  const { language } = useLanguage();
+  const t = translations[language];
+
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    onSubmitComplaint({
-      title,
-      category,
-      description,
-    });
-
+    onSubmitComplaint({ title, category, description });
     setTitle("");
     setCategory("");
     setDescription("");
@@ -23,13 +22,13 @@ function ComplaintForm({ onSubmitComplaint }) {
     <form className="form-grid" onSubmit={handleSubmit}>
       <div>
         <label className="label" htmlFor="complaint-title">
-          Complaint Title
+          {t.complaintTitle}
         </label>
         <input
           id="complaint-title"
           className="input"
           type="text"
-          placeholder="Enter a short title"
+          placeholder={t.complaintTitlePlaceholder}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -38,7 +37,7 @@ function ComplaintForm({ onSubmitComplaint }) {
 
       <div>
         <label className="label" htmlFor="complaint-category">
-          Category
+          {t.categoryLabel}
         </label>
         <select
           id="complaint-category"
@@ -47,24 +46,24 @@ function ComplaintForm({ onSubmitComplaint }) {
           onChange={(e) => setCategory(e.target.value)}
           required
         >
-          <option value="">Select category</option>
-          <option value="Electrical">Electrical</option>
-          <option value="Plumbing">Plumbing</option>
-          <option value="Cleaning">Cleaning</option>
-          <option value="Furniture">Furniture</option>
-          <option value="Internet">Internet</option>
-          <option value="Other">Other</option>
+          <option value="">{t.selectCategory}</option>
+          <option value="Electrical">{t.electrical}</option>
+          <option value="Plumbing">{t.plumbing}</option>
+          <option value="Cleaning">{t.cleaning}</option>
+          <option value="Furniture">{t.furniture}</option>
+          <option value="Internet">{t.internet}</option>
+          <option value="Other">{t.other}</option>
         </select>
       </div>
 
       <div>
         <label className="label" htmlFor="complaint-description">
-          Description
+          {t.description}
         </label>
         <textarea
           id="complaint-description"
           className="textarea"
-          placeholder="Describe the issue clearly"
+          placeholder={t.descriptionPlaceholder}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           required
@@ -72,7 +71,7 @@ function ComplaintForm({ onSubmitComplaint }) {
       </div>
 
       <button className="btn btn-primary" type="submit">
-        Submit Complaint
+        {t.submitComplaint}
       </button>
     </form>
   );
