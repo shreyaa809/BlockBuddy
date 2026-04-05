@@ -1,7 +1,7 @@
 export const translations = {
   en: {
     // App name
-    appName: "HostelFix",
+    appName: "BlockBuddy",
 
     // Login page
     createAccount: "Create your account",
