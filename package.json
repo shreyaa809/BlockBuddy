@@ -1,3 +1,4 @@
+  
 {
   "name": "hostel-issue-app",
   "private": true,
@@ -8,6 +9,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
+  },
+  "homepage": "https://shreyaa809.github.io/BlockBuddy",
+  "scripts": {
+  "build": "vite build",
+  "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
@@ -24,6 +30,7 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "gh-pages": "^6.3.0",
     "globals": "^17.4.0",
     "sass": "^1.99.0",
     "supabase": "^2.84.10",
