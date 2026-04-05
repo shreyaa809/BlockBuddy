@@ -6,8 +6,8 @@ import { translations } from "../translations";
 
 // ✅ NEW: Email domain rules
 const ALLOWED_ADMIN_EMAILS = ["shreyashukla218@gmail.com"];
-const ADMIN_DOMAIN = ".vit.ac.in";
-const STUDENT_DOMAIN = ".vitstudent.ac.in";
+const ADMIN_DOMAIN = "@vit.ac.in";
+const STUDENT_DOMAIN = "@vitstudent.ac.in";
 
 const isValidAdminEmail = (email) => {
   const lower = email.toLowerCase().trim();
