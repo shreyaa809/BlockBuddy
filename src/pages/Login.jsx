@@ -255,7 +255,7 @@ function Login() {
         <div className="login-card">
           <h1>Verify Your Email</h1>
           <p style={{ marginBottom: "16px", color: "#64748b" }}>
-            We sent a 6-digit code to <strong>{pendingSignupData?.email}</strong>.
+            We sent a 8-digit code to <strong>{pendingSignupData?.email}</strong>.
             Enter it below to complete your signup.
           </p>
           <form onSubmit={handleVerifyOtp} className="login-form">
@@ -264,7 +264,7 @@ function Login() {
               type="text"
               inputMode="numeric"
               maxLength={8}
-              placeholder="Enter 6-digit code"
+              placeholder="Enter 8-digit code"
               value={otpValue}
               onChange={(e) => setOtpValue(e.target.value)}
               required
