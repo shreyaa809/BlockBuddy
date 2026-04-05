@@ -270,7 +270,7 @@ function Login() {
               required
               style={{ letterSpacing: "6px", fontSize: "22px", textAlign: "center" }}
             />
-            <button type="submit" disabled={loading || otpValue.length !== 6}>
+            <button type="submit" disabled={loading || otpValue.length <6}>
               {loading ? "Verifying..." : "Verify & Create Account"}
             </button>
           </form>
