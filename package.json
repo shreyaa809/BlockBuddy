@@ -1,19 +1,16 @@
-  
 {
   "name": "hostel-issue-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "homepage": "https://shreyaa809.github.io/BlockBuddy",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "homepage": "https://shreyaa809.github.io/BlockBuddy",
-  "scripts": {
-  "build": "vite build",
-  "deploy": "gh-pages -d dist"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
