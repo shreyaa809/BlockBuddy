@@ -263,7 +263,7 @@ function Login() {
             <input
               type="text"
               inputMode="numeric"
-              maxLength={6}
+              maxLength={8}
               placeholder="Enter 6-digit code"
               value={otpValue}
               onChange={(e) => setOtpValue(e.target.value)}
