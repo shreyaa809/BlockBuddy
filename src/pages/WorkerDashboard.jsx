@@ -27,11 +27,12 @@ function WorkerDashboard() {
     setWorker(w);
 
     // assigned_to stores the worker's id from the workers table
-    const { data, error } = await supabase
-      .from("complaints")
-      .select("*")
-      .eq("assigned_to", w.id)
-      .order("created_at", { ascending: false });
+    // In WorkerDashboard.jsx — fetchAssignedComplaints
+const { data, error } = await supabase
+  .from("complaints")
+  .select("*")
+  .eq("assigned_to", String(w.id)) // ✅ string comparison
+  .order("created_at", { ascending: false });
 
     if (error) setMessage(error.message);
     else setComplaints(data || []);

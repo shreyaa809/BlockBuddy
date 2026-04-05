@@ -62,20 +62,15 @@ function AdminDashboard() {
 
   const assignWorker = async (complaintId) => {
   const workerId = selectedWorkers[complaintId];
-  if (!workerId) {
-    setMessage("Please select a worker first.");
-    return;
-  }
+  if (!workerId) { setMessage("Please select a worker first."); return; }
 
-  // ✅ Parse to integer — HTML select values are always strings,
-  //    but assigned_to expects an integer FK in the database.
-  const workerIdInt = parseInt(workerId, 10);
-
+  // ✅ Send as string — matches text column, works for both int and UUID
   const { error } = await supabase
     .from("complaints")
     .update({
-      assigned_to: workerIdInt,
+      assigned_to: String(workerId),
       status: "In Progress",
+      assigned_at: new Date().toISOString(),
     })
     .eq("id", complaintId);
 
@@ -83,7 +78,7 @@ function AdminDashboard() {
     console.error("Assign error:", error);
     setMessage(error.message);
   } else {
-    const workerName = workers.find((w) => w.id === workerIdInt)?.name || "worker";
+    const workerName = workers.find((w) => String(w.id) === String(workerId))?.name || "worker";
     setMessage(`✅ Task assigned to ${workerName} successfully!`);
     setSelectedWorkers((prev) => {
       const updated = { ...prev };
@@ -160,15 +155,15 @@ function AdminDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const getAssignedWorkerName = (complaint) => {
-    // Try joined data first, then look up from workers list
-    if (complaint.assigned_worker?.name) return complaint.assigned_worker.name;
-    if (complaint.assigned_to) {
-      const w = workers.find((w) => w.id == complaint.assigned_to);
-      return w ? w.name : "Unknown worker";
-    }
-    return null;
-  };
+  // In AdminDashboard.jsx
+const getAssignedWorkerName = (complaint) => {
+  if (complaint.assigned_worker?.name) return complaint.assigned_worker.name;
+  if (complaint.assigned_to) {
+    const w = workers.find((w) => String(w.id) === String(complaint.assigned_to));
+    return w ? w.name : "Unknown worker";
+  }
+  return null;
+};
 
   return (
     <div className="app-shell">
