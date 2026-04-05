@@ -4,34 +4,29 @@ import ComplaintCard from "../components/ComplaintCard";
 import LogoutButton from "../components/LogoutButton";
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations";
+import { useNavigate } from "react-router-dom";
 
 function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [message, setMessage] = useState("");
-
   const [showAddWorker, setShowAddWorker] = useState(false);
   const [showWorkerDetails, setShowWorkerDetails] = useState(null);
   const [showAllWorkers, setShowAllWorkers] = useState(false);
-
-  // Track selected worker per complaint before saving
   const [selectedWorkers, setSelectedWorkers] = useState({});
-
   const [newWorker, setNewWorker] = useState({ name: "", phone: "", employee_id: "" });
 
   const { language } = useLanguage();
   const t = translations[language];
+  const navigate = useNavigate();
 
   const generateTempPassword = () => Math.random().toString(36).slice(-8).toUpperCase();
 
+  // ✅ Plain select — no broken FK join
   const fetchData = async () => {
-    // Fetch complaints with assigned worker name from workers table directly
     const { data: complaintsData, error: complaintsError } = await supabase
       .from("complaints")
-      .select(`
-        *,
-        assigned_worker:workers!complaints_assigned_to_fkey(id, name, employee_id)
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
     const { data: workersData, error: workersError } = await supabase
@@ -39,99 +34,79 @@ function AdminDashboard() {
       .select("id, name, phone, employee_id, created_at")
       .order("created_at", { ascending: false });
 
-    if (complaintsError) {
-      // Fallback: fetch without join if foreign key name differs
-      const { data: fallback, error: fallbackError } = await supabase
-        .from("complaints")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!fallbackError) setComplaints(fallback || []);
-      else setMessage(complaintsError.message);
-    } else {
-      setComplaints(complaintsData || []);
-    }
+    if (complaintsError) setMessage(complaintsError.message);
+    else setComplaints(complaintsData || []);
 
     if (workersError) setMessage(workersError.message);
     else setWorkers(workersData || []);
+  };
+
+  // ✅ String comparison handles UUID
+  const getAssignedWorkerName = (complaint) => {
+    if (!complaint.assigned_to) return null;
+    const w = workers.find((w) => String(w.id) === String(complaint.assigned_to));
+    return w ? w.name : null;
   };
 
   const handleSelectWorker = (complaintId, workerId) => {
     setSelectedWorkers((prev) => ({ ...prev, [complaintId]: workerId }));
   };
 
+  // ✅ Store as string to match text column
   const assignWorker = async (complaintId) => {
-  const workerId = selectedWorkers[complaintId];
-  if (!workerId) { setMessage("Please select a worker first."); return; }
-
-  // ✅ Send as string — matches text column, works for both int and UUID
-  const { error } = await supabase
-    .from("complaints")
-    .update({
-      assigned_to: String(workerId),
-      status: "In Progress",
-      assigned_at: new Date().toISOString(),
-    })
-    .eq("id", complaintId);
-
-  if (error) {
-    console.error("Assign error:", error);
-    setMessage(error.message);
-  } else {
-    const workerName = workers.find((w) => String(w.id) === String(workerId))?.name || "worker";
-    setMessage(`✅ Task assigned to ${workerName} successfully!`);
-    setSelectedWorkers((prev) => {
-      const updated = { ...prev };
-      delete updated[complaintId];
-      return updated;
-    });
-    fetchData();
-  }
-};
-
-  const unassignWorker = async (complaintId) => {
-    const confirm = window.confirm("Remove this worker assignment?");
-    if (!confirm) return;
+    const workerId = selectedWorkers[complaintId];
+    if (!workerId) { setMessage("Please select a worker first."); return; }
 
     const { error } = await supabase
       .from("complaints")
-      .update({ assigned_to: null, status: "Pending" })
+      .update({
+        assigned_to: String(workerId),
+        status: "In Progress",
+        assigned_at: new Date().toISOString(),
+      })
       .eq("id", complaintId);
 
+    if (error) {
+      console.error("Assign error:", error);
+      setMessage(error.message);
+    } else {
+      const workerName = workers.find((w) => String(w.id) === String(workerId))?.name || "worker";
+      setMessage(`✅ Task assigned to ${workerName} successfully!`);
+      setSelectedWorkers((prev) => {
+        const updated = { ...prev };
+        delete updated[complaintId];
+        return updated;
+      });
+      fetchData();
+    }
+  };
+
+  const unassignWorker = async (complaintId) => {
+    if (!window.confirm("Remove this worker assignment?")) return;
+    const { error } = await supabase
+      .from("complaints")
+      .update({ assigned_to: null, status: "Pending", assigned_at: null })
+      .eq("id", complaintId);
     if (error) setMessage(error.message);
     else { setMessage("Worker unassigned."); fetchData(); }
   };
 
   const createWorker = async (e) => {
     e.preventDefault();
-
     if (!newWorker.name || !newWorker.phone || !newWorker.employee_id) {
-      setMessage(t.fieldsRequired);
-      return;
+      setMessage(t.fieldsRequired); return;
     }
-
     const { data: existing } = await supabase
-      .from("workers")
-      .select("id")
-      .eq("employee_id", newWorker.employee_id)
-      .maybeSingle();
-
+      .from("workers").select("id").eq("employee_id", newWorker.employee_id).maybeSingle();
     if (existing) { setMessage(t.employeeIdExists); return; }
 
     const tempPassword = generateTempPassword();
-
     const { error } = await supabase.from("workers").insert([{
-      name: newWorker.name,
-      phone: newWorker.phone,
-      employee_id: newWorker.employee_id,
-      temp_password: tempPassword,
-      password: null,
-      is_first_login: true,
-      must_change_password: true,
+      name: newWorker.name, phone: newWorker.phone,
+      employee_id: newWorker.employee_id, temp_password: tempPassword,
+      password: null, is_first_login: true, must_change_password: true,
     }]);
-
     if (error) { setMessage(error.message); return; }
-
     setMessage(`${t.workerCreated} ${tempPassword}`);
     setShowAddWorker(false);
     setNewWorker({ name: "", phone: "", employee_id: "" });
@@ -141,29 +116,24 @@ function AdminDashboard() {
   const openWorkerDetails = async (workerId) => {
     const { data: workerData, error: workerError } = await supabase
       .from("workers").select("*").eq("id", workerId).single();
-
     if (workerError) { setMessage(workerError.message); return; }
 
     const { data: assignedComplaints } = await supabase
-      .from("complaints").select("status").eq("assigned_to", workerId);
-
+      .from("complaints").select("status").eq("assigned_to", String(workerId));
     const totalAssigned = assignedComplaints?.length || 0;
     const solved = assignedComplaints?.filter((c) => c.status === "Resolved").length || 0;
-
     setShowWorkerDetails({ ...workerData, totalAssigned, solved, pending: totalAssigned - solved });
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const formatDate = (dateString) => {
+    if (!dateString) return "—";
+    return new Date(dateString).toLocaleString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  };
 
-  // In AdminDashboard.jsx
-const getAssignedWorkerName = (complaint) => {
-  if (complaint.assigned_worker?.name) return complaint.assigned_worker.name;
-  if (complaint.assigned_to) {
-    const w = workers.find((w) => String(w.id) === String(complaint.assigned_to));
-    return w ? w.name : "Unknown worker";
-  }
-  return null;
-};
+  useEffect(() => { fetchData(); }, []);
 
   return (
     <div className="app-shell">
@@ -174,6 +144,9 @@ const getAssignedWorkerName = (complaint) => {
             <p className="dashboard-subtitle">{t.adminSubtitle}</p>
           </div>
           <div className="top-actions">
+            <button className="btn btn-secondary" onClick={() => navigate("/helpline")}>
+              📞 {t.helpline || "Helpline Numbers"}
+            </button>
             <LogoutButton />
           </div>
         </div>
@@ -259,7 +232,6 @@ const getAssignedWorkerName = (complaint) => {
               {t.addNewWorker}
             </button>
           </div>
-
           {workers.slice(0, 3).map((worker) => (
             <div key={worker.id} className="worker-preview" onClick={() => openWorkerDetails(worker.id)}>
               <div>
@@ -269,13 +241,11 @@ const getAssignedWorkerName = (complaint) => {
               <button className="btn btn-secondary btn-sm">{t.view}</button>
             </div>
           ))}
-
           {workers.length > 3 && (
             <button className="btn btn-link" onClick={() => setShowAllWorkers(!showAllWorkers)}>
               {showAllWorkers ? t.showLess : `${t.seeAll} (${workers.length - 3} more)`}
             </button>
           )}
-
           {showAllWorkers && (
             <div className="workers-full-list">
               {workers.slice(3).map((worker) => (
@@ -294,7 +264,6 @@ const getAssignedWorkerName = (complaint) => {
         {/* Complaints Panel */}
         <div className="panel">
           <h2 className="panel-title">{t.allComplaints} ({complaints.length})</h2>
-
           {complaints.length === 0 ? (
             <div className="empty-state">{t.noComplaintsYet}</div>
           ) : (
@@ -304,23 +273,25 @@ const getAssignedWorkerName = (complaint) => {
                 return (
                   <div key={item.id} className="complaint-card">
                     <ComplaintCard complaint={item} />
-
+                    {item.assigned_at && (
+                      <p className="complaint-meta" style={{ marginTop: "6px", fontSize: "12px", color: "#64748b" }}>
+                        📅 <strong>Assigned on:</strong> {formatDate(item.assigned_at)}
+                      </p>
+                    )}
                     <div style={{ marginTop: "12px" }}>
                       {assignedName ? (
-                        // Already assigned — show who, allow unassign
                         <div className="inline-row" style={{ alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                           <span className="badge badge-success">
                             ✅ {t.assignedToWorker}: <strong>{assignedName}</strong>
                           </span>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => unassignWorker(item.id)}
-                          >
+                          {item.status === "Awaiting Confirmation" && (
+                            <span className="badge badge-progress">⏳ Awaiting student confirmation</span>
+                          )}
+                          <button className="btn btn-danger btn-sm" onClick={() => unassignWorker(item.id)}>
                             Unassign
                           </button>
                         </div>
                       ) : (
-                        // Not assigned — show dropdown + Save Changes button
                         <div className="inline-row" style={{ alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                           <label className="label" style={{ margin: 0 }}>{t.assignWorker}</label>
                           <select

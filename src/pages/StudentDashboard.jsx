@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 function StudentDashboard() {
   const navigate = useNavigate();
   const [complaints, setComplaints] = useState([]);
+  const [workers, setWorkers] = useState([]);  // ✅ added
   const [message, setMessage] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
 
@@ -30,31 +31,23 @@ function StudentDashboard() {
     setRoomNumber(s.room_number || "");
   };
 
+  // ✅ Plain select, no broken FK join
   const fetchComplaints = async () => {
     const s = getStudent();
     if (!s) { setMessage(t.sessionExpired); return; }
-
     const { data, error } = await supabase
       .from("complaints")
-      .select(`
-        *,
-        assigned_worker:workers!complaints_assigned_to_fkey(id, name, employee_id)
-      `)
+      .select("*")
       .eq("created_by", s.id)
       .order("created_at", { ascending: false });
+    if (error) setMessage(error.message);
+    else setComplaints(data || []);
+  };
 
-    if (error) {
-      const { data: fallback, error: fallbackError } = await supabase
-        .from("complaints")
-        .select("*")
-        .eq("created_by", s.id)
-        .order("created_at", { ascending: false });
-
-      if (!fallbackError) setComplaints(fallback || []);
-      else setMessage(error.message);
-    } else {
-      setComplaints(data || []);
-    }
+  // ✅ Fetch worker names to display who is assigned
+  const fetchWorkers = async () => {
+    const { data } = await supabase.from("workers").select("id, name");
+    if (data) setWorkers(data);
   };
 
   const handleAddComplaint = async (complaintData) => {
@@ -62,36 +55,42 @@ function StudentDashboard() {
     const s = getStudent();
     if (!s) { setMessage(t.sessionExpired); return; }
     if (!s.room_number) { setMessage(t.roomNotFound); return; }
-
     const { error } = await supabase.from("complaints").insert([{
       ...complaintData,
       room_number: s.room_number,
       status: "Pending",
       created_by: s.id,
     }]);
-
     if (error) setMessage(error.message);
     else { setMessage(t.complaintSubmitted); fetchComplaints(); }
   };
 
   const handleWithdrawComplaint = async (complaintId) => {
-    const confirmWithdraw = window.confirm(t.withdrawConfirm);
-    if (!confirmWithdraw) return;
-
+    if (!window.confirm(t.withdrawConfirm)) return;
     const s = getStudent();
     if (!s) { setMessage(t.sessionExpired); return; }
+    const { error } = await supabase
+      .from("complaints").delete()
+      .eq("id", complaintId).eq("created_by", s.id);
+    if (error) { console.error("Withdraw error:", error); setMessage(error.message); }
+    else { setMessage(t.complaintWithdrawn); fetchComplaints(); }
+  };
 
+  // ✅ Student confirms or rejects worker's resolution
+  const handleConfirmResolution = async (complaintId, confirmed) => {
+    const s = getStudent();
+    if (!s) { setMessage(t.sessionExpired); return; }
+    const newStatus = confirmed ? "Resolved" : "In Progress";
     const { error } = await supabase
       .from("complaints")
-      .delete()
+      .update({ status: newStatus })
       .eq("id", complaintId)
       .eq("created_by", s.id);
-
-    if (error) {
-      console.error("Withdraw error:", error);
-      setMessage(error.message);
-    } else {
-      setMessage(t.complaintWithdrawn);
+    if (error) setMessage(error.message);
+    else {
+      setMessage(confirmed
+        ? "✅ Complaint marked as resolved. Thank you for confirming!"
+        : "🔄 Complaint sent back to In Progress. The worker will be notified.");
       fetchComplaints();
     }
   };
@@ -99,11 +98,10 @@ function StudentDashboard() {
   useEffect(() => {
     fetchStudentProfile();
     fetchComplaints();
+    fetchWorkers();  // ✅ added
   }, []);
 
-  useEffect(() => {
-    fetchStudentProfile();
-  }, [language]);
+  useEffect(() => { fetchStudentProfile(); }, [language]);
 
   return (
     <div className="app-shell">
@@ -113,13 +111,10 @@ function StudentDashboard() {
             <h1>{t.studentDashboard}</h1>
             <p className="dashboard-subtitle">{t.studentSubtitle}</p>
             {roomNumber && (
-              <p className="dashboard-subtitle">
-                {t.registeredRoom}: {roomNumber}
-              </p>
+              <p className="dashboard-subtitle">{t.registeredRoom}: {roomNumber}</p>
             )}
           </div>
           <div className="top-actions">
-            {/* ✅ Helpline button is HERE, inside return, near LogoutButton */}
             <button className="btn btn-secondary" onClick={() => navigate("/helpline")}>
               📞 {t.helpline || "Helpline Numbers"}
             </button>
@@ -136,26 +131,64 @@ function StudentDashboard() {
 
         <div className="panel">
           <h2 className="panel-title">{t.myComplaints}</h2>
-
           {complaints.length === 0 ? (
             <div className="empty-state">{t.noComplaints}</div>
           ) : (
             <div className="complaints-list">
-              {complaints.map((item) => (
-                <div key={item.id} className="complaint-card">
-                  <ComplaintCard complaint={item} />
-                  {item.status === "Pending" && (
-                    <div className="inline-row" style={{ marginTop: "12px" }}>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => handleWithdrawComplaint(item.id)}
-                      >
-                        {t.withdrawComplaint}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {complaints.map((item) => {
+                // ✅ Look up worker name from workers list
+                const assignedWorker = workers.find(
+                  (w) => String(w.id) === String(item.assigned_to)
+                );
+                return (
+                  <div key={item.id} className="complaint-card">
+                    <ComplaintCard complaint={item} />
+
+                    {/* ✅ Show assigned worker name */}
+                    {assignedWorker && (
+                      <p className="complaint-meta" style={{ marginTop: "8px" }}>
+                        👷 <strong>Assigned to:</strong> {assignedWorker.name}
+                      </p>
+                    )}
+
+                    {/* ✅ Confirmation prompt when worker marks resolved */}
+                    {item.status === "Awaiting Confirmation" && (
+                      <div style={{
+                        marginTop: "12px", padding: "14px 16px",
+                        background: "#fef9c3", border: "1.5px solid #fde047",
+                        borderRadius: "10px",
+                      }}>
+                        <p style={{ fontWeight: 600, marginBottom: "4px", color: "#854d0e" }}>
+                          🔔 The worker has marked this complaint as resolved.
+                        </p>
+                        <p style={{ fontSize: "13px", color: "#92400e", marginBottom: "12px" }}>
+                          Was your issue actually fixed? Please confirm below.
+                        </p>
+                        <div className="inline-row">
+                          <button className="btn btn-success"
+                            onClick={() => handleConfirmResolution(item.id, true)}>
+                            ✅ Yes, it's resolved
+                          </button>
+                          <button className="btn btn-danger"
+                            onClick={() => handleConfirmResolution(item.id, false)}>
+                            ❌ No, still not fixed
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Withdraw only for Pending */}
+                    {item.status === "Pending" && (
+                      <div className="inline-row" style={{ marginTop: "12px" }}>
+                        <button className="btn btn-danger"
+                          onClick={() => handleWithdrawComplaint(item.id)}>
+                          {t.withdrawComplaint}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
