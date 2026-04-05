@@ -1,4 +1,6 @@
 import "./App.css";
+// Add this with your other imports at the top
+import HelplinePage from "./pages/HelplinePage";
 import { Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import StudentDashboard from "./pages/StudentDashboard";
@@ -12,6 +14,8 @@ function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/worker-signup/:workerId" element={<WorkerSignup />} />
+      
+      <Route path="/helpline" element={<HelplinePage />} />
       <Route
         path="/student"
         element={

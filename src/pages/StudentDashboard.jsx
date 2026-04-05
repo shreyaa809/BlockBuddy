@@ -5,8 +5,10 @@ import ComplaintCard from "../components/ComplaintCard";
 import LogoutButton from "../components/LogoutButton";
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../translations";
+import { useNavigate } from "react-router-dom";
 
 function StudentDashboard() {
+  const navigate = useNavigate();
   const [complaints, setComplaints] = useState([]);
   const [message, setMessage] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
@@ -42,7 +44,6 @@ function StudentDashboard() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      // Fallback without join if FK name differs
       const { data: fallback, error: fallbackError } = await supabase
         .from("complaints")
         .select("*")
@@ -57,45 +58,43 @@ function StudentDashboard() {
   };
 
   const handleAddComplaint = async (complaintData) => {
-  setMessage("");
-  const s = getStudent();
-  if (!s) { setMessage(t.sessionExpired); return; }
-  if (!s.room_number) { setMessage(t.roomNotFound); return; }
+    setMessage("");
+    const s = getStudent();
+    if (!s) { setMessage(t.sessionExpired); return; }
+    if (!s.room_number) { setMessage(t.roomNotFound); return; }
 
-  const { error } = await supabase.from("complaints").insert([{
-    ...complaintData,
-    room_number: s.room_number,
-    status: "Pending",
-    created_by: s.id,   // make sure this is always the same id used below
-  }]);
+    const { error } = await supabase.from("complaints").insert([{
+      ...complaintData,
+      room_number: s.room_number,
+      status: "Pending",
+      created_by: s.id,
+    }]);
 
-  if (error) setMessage(error.message);
-  else { setMessage(t.complaintSubmitted); fetchComplaints(); }
-};
+    if (error) setMessage(error.message);
+    else { setMessage(t.complaintSubmitted); fetchComplaints(); }
+  };
 
-const handleWithdrawComplaint = async (complaintId) => {
-  const confirmWithdraw = window.confirm(t.withdrawConfirm);
-  if (!confirmWithdraw) return;
+  const handleWithdrawComplaint = async (complaintId) => {
+    const confirmWithdraw = window.confirm(t.withdrawConfirm);
+    if (!confirmWithdraw) return;
 
-  const s = getStudent();
-  if (!s) { setMessage(t.sessionExpired); return; }
+    const s = getStudent();
+    if (!s) { setMessage(t.sessionExpired); return; }
 
-  const { error, count } = await supabase
-    .from("complaints")
-    .delete()
-    .eq("id", complaintId)
-    .eq("created_by", s.id);
-    // ✅ Removed .eq("status", "Pending") — the button is already conditionally shown,
-    //    and this extra filter was silently killing the delete when status drifted.
+    const { error } = await supabase
+      .from("complaints")
+      .delete()
+      .eq("id", complaintId)
+      .eq("created_by", s.id);
 
-  if (error) {
-    console.error("Withdraw error:", error);
-    setMessage(error.message);
-  } else {
-    setMessage(t.complaintWithdrawn);
-    fetchComplaints();
-  }
-};
+    if (error) {
+      console.error("Withdraw error:", error);
+      setMessage(error.message);
+    } else {
+      setMessage(t.complaintWithdrawn);
+      fetchComplaints();
+    }
+  };
 
   useEffect(() => {
     fetchStudentProfile();
@@ -120,6 +119,10 @@ const handleWithdrawComplaint = async (complaintId) => {
             )}
           </div>
           <div className="top-actions">
+            {/* ✅ Helpline button is HERE, inside return, near LogoutButton */}
+            <button className="btn btn-secondary" onClick={() => navigate("/helpline")}>
+              📞 {t.helpline || "Helpline Numbers"}
+            </button>
             <LogoutButton />
           </div>
         </div>
@@ -141,7 +144,6 @@ const handleWithdrawComplaint = async (complaintId) => {
               {complaints.map((item) => (
                 <div key={item.id} className="complaint-card">
                   <ComplaintCard complaint={item} />
-
                   {item.status === "Pending" && (
                     <div className="inline-row" style={{ marginTop: "12px" }}>
                       <button
